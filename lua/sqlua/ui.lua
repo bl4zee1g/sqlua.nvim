@@ -125,7 +125,8 @@ end
 ---Sets highlighting in the sidebar based on the hl
 ---@return nil
 local function highlightSidebarNumbers()
-    local buf = vim.api.nvim_win_get_buf(UI.windows.sidebar)
+    local buf = UI.buffers.sidebar
+    if buf == nil or not vim.api.nvim_buf_is_valid(buf) then return end
     local lines = vim.api.nvim_buf_get_lines(buf, 0, vim.api.nvim_buf_line_count(buf), false)
     for line, text in ipairs(lines) do
         -- add highlight excluding final "count" in parens
@@ -623,7 +624,10 @@ function UI:refreshSidebar()
     if buf == nil then return end
 
     -- "Help" section for both expanded and collapsed
-    local winwidth = vim.api.nvim_win_get_width(self.windows.sidebar)
+    local winwidth = 40
+    if self.windows.sidebar and vim.api.nvim_win_is_valid(self.windows.sidebar) then
+        winwidth = vim.api.nvim_win_get_width(self.windows.sidebar)
+    end
     local helptext = "press ? to toggle help"
     local hl = string.len(helptext) / 2
     local helpTextTable = {
@@ -742,11 +746,13 @@ function UI:refreshSidebar()
     end
 
     --- error bounds checking for cursor entering the sidebar
-    if not pcall(function() vim.api.nvim_win_set_cursor(self.windows.sidebar, setCursor) end) then
-        local min = math.min(srow, self.last_cursor_position.sidebar[1] - #helpTextTable)
-        local max = math.max(2, self.last_cursor_position.sidebar[2])
-        if min <= 0 then min = 1 end
-        vim.api.nvim_win_set_cursor(self.windows.sidebar, { min, max })
+    if self.windows.sidebar and vim.api.nvim_win_is_valid(self.windows.sidebar) then
+        if not pcall(function() vim.api.nvim_win_set_cursor(self.windows.sidebar, setCursor) end) then
+            local min = math.min(srow, self.last_cursor_position.sidebar[1] - #helpTextTable)
+            local max = math.max(2, self.last_cursor_position.sidebar[2])
+            if min <= 0 then min = 1 end
+            vim.api.nvim_win_set_cursor(self.windows.sidebar, { min, max })
+        end
     end
 
     vim.fn.winrestview(winPos)

@@ -790,11 +790,12 @@ function UI:createResultsPane(data)
     local win = vim.api.nvim_get_current_win()
     local buf = nil
 
-    if Utils.getBufferByName("ResultsBuf") == nil then
+    local existing = Utils.getBufferByName("ResultsBuf")
+    if existing == nil then
         buf = vim.api.nvim_create_buf(false, true)
         vim.api.nvim_buf_set_name(buf, "ResultsBuf")
     else
-        buf = existing_buf
+        buf = existing
         vim.api.nvim_set_option_value("modifiable", true, { buf = buf })
     end
 

@@ -23,8 +23,21 @@ DEFAULT_CONFIG = {
     },
 }
 
+-- Shared, mutable state read by command closures at *invocation* time
+-- (not captured once at registration time). This makes `M.setup` safe to
+-- call more than once (e.g. once from plugin/sqlua.lua's bootstrap command
+-- and once from a lazy.nvim `config` function) regardless of call order:
+-- whichever caller passes real opts always wins, and the user commands are
+-- only ever registered once so the very first `:SQLua` invocation always
+-- works instead of silently no-opping.
+local state = {
+    config = vim.deepcopy(DEFAULT_CONFIG),
+    commands_registered = false,
+}
+
 M.setup = function(opts)
-    local config = vim.tbl_deep_extend("force", DEFAULT_CONFIG, opts or {})
+    state.config = vim.tbl_deep_extend("force", DEFAULT_CONFIG, opts or {})
+    local config = state.config
 
     -- creating root directory
     vim.fn.mkdir(SQLUA_ROOT_DIR, "p")
@@ -37,9 +50,13 @@ M.setup = function(opts)
     })
     if vim.fn.filereadable(connections_file) == 0 then Connection.write({}) end
 
+    if state.commands_registered then return end
+    state.commands_registered = true
+
     -- main function to enter the UI
     vim.api.nvim_create_user_command("SQLua", function(args)
-        UI:setup(config)
+        local cfg = state.config
+        UI:setup(cfg)
         UI.initial_layout_loaded = true
 
         local cons = Connection.read()
@@ -47,7 +64,7 @@ M.setup = function(opts)
             local name, url = con["name"], con["url"]
             vim.fn.mkdir(SQLUA_ROOT_DIR .. "/" .. name, "p")
             local connection = Connection.setup(name, url, UI.options)
-            if config.load_connections_on_start and connection then connection:connect() end
+            if cfg.load_connections_on_start and connection then connection:connect() end
             UI.dbs[name] = connection
         end
 
@@ -64,13 +81,29 @@ M.setup = function(opts)
         -- TODO: verify url string
         local name = vim.fn.input("Enter the name for the connection: ")
         Connection.add(url, name)
-        local dbs = utils.getDatabases(config.connections_save_location)
+        local cfg = state.config
+        local dbs = utils.getDatabases(cfg.connections_save_location)
         for _, db in pairs(dbs) do
-            local connection = Connection.setup(db.name, db.url, config)
-            if config.load_connections_on_start and connection then connection:connect() end
+            local connection = Connection.setup(db.name, db.url, cfg)
+            if cfg.load_connections_on_start and connection then connection:connect() end
         end
         UI:refreshSidebar()
         if UI.num_dbs > 0 then vim.api.nvim_win_set_cursor(UI.windows.sidebar, { 2, 2 }) end
+    end, {})
+
+    -- Attach the current buffer to sqlua's editor tracking, so the
+    -- execute-query keybind works on it and it shows under "Buffers" even
+    -- though it wasn't created via "New Editor" or the file tree.
+    vim.api.nvim_create_user_command("SQLuaAttachBuffer", function()
+        if not UI.initial_layout_loaded then
+            vim.notify("Run :SQLua first", vim.log.levels.WARN)
+            return
+        end
+        local buf = vim.api.nvim_get_current_buf()
+        if not vim.tbl_contains(UI.buffers.editors, buf) then
+            table.insert(UI.buffers.editors, buf)
+        end
+        UI:refreshSidebar()
     end, {})
 end
 

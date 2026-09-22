@@ -13,7 +13,7 @@ function Mysql:setup(name, url, options)
     s.name = name
     s.url = url
     s.dbms = "mysql"
-    s.cmd = "mariadb"
+    s.cmd = "mysql"
     s.cli_args = {}
     s.connection_info = s:parseUrl()
     for k, v in pairs(s.connection_info) do
@@ -28,8 +28,10 @@ function Mysql:setup(name, url, options)
         end
     end
     table.insert(s.cli_args, "-t") -- table output
-    table.insert(s.cli_args, "--safe-updates")
-    table.insert(s.cli_args, "--select-limit=" .. options.default_limit)
+    -- NOTE: --safe-updates implicitly caps every SELECT lacking an explicit
+    -- LIMIT (including the internal schema-listing query) at
+    -- --select-limit rows, silently hiding databases/tables. Disabled to
+    -- match the mariadb connector.
     local queries = require("sqlua.queries." .. s.dbms)
     s.schema_query = string.gsub(queries.SchemaQuery, "\n", " ")
     return s
@@ -53,7 +55,7 @@ end
 ---@param data table raw result data
 ---@param query_type string
 function Mysql:dbmsCleanResults(data, query_type)
-    if string.find(data[1], "mysql%: %[Warning%]") then table.remove(data, 1) end
+    if data[1] and string.find(data[1], "mysql%: %[Warning%]") then table.remove(data, 1) end
     return data
 end
 

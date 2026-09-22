@@ -1341,9 +1341,17 @@ end
 ---@param config table
 ---@return nil
 function UI:setup(config)
+    if self.initial_layout_loaded then
+        if self.windows.sidebar and vim.api.nvim_win_is_valid(self.windows.sidebar) then
+            vim.api.nvim_set_current_win(self.windows.sidebar)
+        end
+        return
+    end
     self.options = config
+    local scratch = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(scratch)
     for _, buf in pairs(vim.api.nvim_list_bufs()) do
-        vim.api.nvim_buf_delete(buf, { force = true, unload = false })
+        if buf ~= scratch then vim.api.nvim_buf_delete(buf, { force = true, unload = false }) end
     end
 
     local execute_callback = function()
@@ -1474,7 +1482,7 @@ function UI:setup(config)
     createEditor(editor_win)
     createSidebar()
 
-    if vim.api.nvim_buf_is_valid(1) then vim.api.nvim_buf_delete(1, {}) end
+    if vim.api.nvim_buf_is_valid(scratch) then vim.api.nvim_buf_delete(scratch, { force = true }) end
 end
 
 ---performs vim syntax highlighting on results pane

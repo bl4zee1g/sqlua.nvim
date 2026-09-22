@@ -82,9 +82,21 @@ M.shallowcopy = function(orig)
 end
 
 M.parse_jdbc = function(jdbc_str)
-    -- Extract main components using pattern matching
-    local subprotocol, authority, path, query = jdbc_str:match("^(%w+)://([^/]+)/([^?]*)%??(.*)")
+    -- Extract scheme and everything after "scheme://"
+    local subprotocol, rest = jdbc_str:match("^(%w+)://(.*)$")
     if not subprotocol then return nil, "Invalid JDBC format" end
+
+    -- authority is everything up to the first "/" or "?" (both optional)
+    local authority, remainder = rest:match("^([^/?]*)(.*)$")
+
+    local path, query
+    if remainder:sub(1, 1) == "/" then
+        path, query = remainder:sub(2):match("^([^?]*)%??(.*)$")
+    elseif remainder:sub(1, 1) == "?" then
+        path, query = "", remainder:sub(2)
+    else
+        path, query = "", ""
+    end
 
     -- Initialize result table
     local result = {

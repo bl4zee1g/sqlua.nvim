@@ -91,20 +91,6 @@ M.setup = function(opts)
         if UI.num_dbs > 0 then vim.api.nvim_win_set_cursor(UI.windows.sidebar, { 2, 2 }) end
     end, {})
 
-    -- Attach the current buffer to sqlua's editor tracking, so the
-    -- execute-query keybind works on it and it shows under "Buffers" even
-    -- though it wasn't created via "New Editor" or the file tree.
-    vim.api.nvim_create_user_command("SQLuaAttachBuffer", function()
-        if not UI.initial_layout_loaded then
-            vim.notify("Run :SQLua first", vim.log.levels.WARN)
-            return
-        end
-        local buf = vim.api.nvim_get_current_buf()
-        if not vim.tbl_contains(UI.buffers.editors, buf) then
-            table.insert(UI.buffers.editors, buf)
-        end
-        UI:refreshSidebar()
-    end, {})
 end
 
 return M
